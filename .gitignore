@@ -29,3 +29,5 @@ docs/sphinx/build
 .ruff_cache/
 .mypy_cache/
 .vscode/
+
+*NOTSHARE*
