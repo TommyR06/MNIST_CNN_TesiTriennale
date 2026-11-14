@@ -131,7 +131,10 @@ def softmax_percent(net, img_tensor):
 
 
 def apri_lavagna(reti):
-    """Apre la lavagna e classifica il disegno con tutte le reti del dizionario {nome: rete}."""
+    """Apre la lavagna e classifica il disegno con tutte le reti del dizionario {nome: rete}.
+
+    Il grafico mostra le probabilità Softmax di ogni rete; sotto i bottoni, per ogni rete, un quadratino
+    del suo colore indica la cifra riconosciuta (quella con la probabilità più alta)."""
     if isinstance(reti, dict):
         reti = list(reti.items())
     if not 1 <= len(reti) <= len(COLORI_RETI):
@@ -247,6 +250,7 @@ def apri_lavagna(reti):
         canvas_matplot.draw()
         mostra_messaggio("Lavagna pulita. Disegna!")
         mostra_input(None)
+        mostra_cifre(None)
 
     def predict():
         img_small = riduci_disegno(img_pil)
@@ -254,6 +258,7 @@ def apri_lavagna(reti):
 
         if img_small is None:
             mostra_messaggio("Errore: Lavagna vuota!", "#ff4d4d")
+            mostra_cifre(None)
             return
 
         img_tensor = torch.tensor(img_small, dtype=torch.float32) / 255.0
@@ -264,6 +269,7 @@ def apri_lavagna(reti):
         probs = [softmax_percent(net, img_tensor) for net in nets]
 
         mostra_messaggio("Classificazione completata")
+        mostra_cifre(probs)
 
         ax.clear()
         setup_axes()
@@ -317,6 +323,31 @@ def apri_lavagna(reti):
         lbl_preview.image = foto   # riferimento necessario, altrimenti l'immagine viene cancellata
 
     mostra_input(None)
+
+    # --- CIFRA RICONOSCIUTA DA OGNI RETE (sotto i bottoni) ---
+    # Stessa disposizione della legenda del grafico (stesse colonne e stesso ordine): per ogni rete un
+    # quadratino del suo colore e la cifra riconosciuta, cioè quella con la probabilità Softmax più alta.
+    ris_frame = tk.Frame(right_frame, bg='#e8e8e8')
+    ris_frame.pack(pady=(4, 0))
+    tk.Label(ris_frame, text="Cifra riconosciuta da ogni rete (colori e posizioni come nella legenda):",
+             font=("Helvetica", 9), bg='#e8e8e8', fg='#555555').grid(row=0, column=0, columnspan=n_col_legenda, pady=(0, 2))
+    lbl_cifre = []
+    for k, colore in enumerate(colori):
+        colonna, riga = divmod(k, righe_legenda)   # la legenda riempie prima la colonna di sinistra
+        cella = tk.Frame(ris_frame, bg='#e8e8e8')
+        cella.grid(row=riga + 1, column=colonna, padx=28, pady=0)
+        quadratino = tk.Canvas(cella, width=16, height=16, bg='#e8e8e8', highlightthickness=0)
+        quadratino.create_rectangle(1, 1, 15, 15, fill=colore, outline='black')
+        quadratino.pack(side=tk.LEFT, padx=(0, 8))
+        lbl = tk.Label(cella, text="-", font=("Helvetica", 13, "bold"), bg='#e8e8e8', fg='#333333', width=2, anchor='w',
+                       pady=0)
+        lbl.pack(side=tk.LEFT)
+        lbl_cifre.append(lbl)
+
+    # probs: lista delle probabilità di ogni rete (None = nessuna classificazione, si mostra "-")
+    def mostra_cifre(probs):
+        for k, lbl in enumerate(lbl_cifre):
+            lbl.config(text="-" if probs is None else str(int(np.argmax(probs[k]))))
 
     root.mainloop()
 
@@ -372,8 +403,9 @@ def raccogli_cifre(campioni_per_cifra=10, titolo="Dataset personale MNIST"):
 
     La raccolta parte sempre da zero e i disegni restano in memoria: su disco non viene scritto nulla,
     quindi il dataset salvato in precedenza non viene toccato. Per salvarli si usa salva_dataset().
-    Non è obbligatorio raggiungere campioni_per_cifra: il bottone "Fine" (o la X della finestra) chiude
-    la raccolta in qualsiasi momento.
+    Non è obbligatorio raggiungere campioni_per_cifra. I disegni vengono restituiti SOLO se si preme il
+    bottone "Fine": chiudendo la finestra con la X la raccolta viene annullata e la funzione restituisce
+    array vuoti, così il notebook lascia invariato il dataset salvato in precedenza.
 
     Restituisce tre array numpy:
       - images:    uint8 (N, 28, 28), i disegni ridotti a 28x28
@@ -385,7 +417,8 @@ def raccogli_cifre(campioni_per_cifra=10, titolo="Dataset personale MNIST"):
 
     # --- SETUP VARIABILI ---
     canvas_size = 400
-    stato = {'last_x': None, 'last_y': None, 'cifra': 0, 'vuota': True}
+    # 'confermata' diventa True solo premendo "Fine": senza conferma la raccolta viene scartata.
+    stato = {'last_x': None, 'last_y': None, 'cifra': 0, 'vuota': True, 'confermata': False}
 
     img_pil = Image.new("L", (canvas_size, canvas_size), color=0)
     draw_mem = ImageDraw.Draw(img_pil)
@@ -508,8 +541,16 @@ def raccogli_cifre(campioni_per_cifra=10, titolo="Dataset personale MNIST"):
         aggiorna_interfaccia()
 
     def fine():
-        # Chiude la raccolta: i disegni raccolti vengono restituiti al notebook, anche se l'obiettivo non è stato raggiunto.
+        # Conferma la raccolta: i disegni raccolti vengono restituiti al notebook, anche se l'obiettivo non è stato raggiunto.
+        stato['confermata'] = True
         root.destroy()
+
+    def chiudi_senza_salvare():
+        # X della finestra: la raccolta viene annullata e il dataset salvato in precedenza resta invariato.
+        stato['confermata'] = False
+        root.destroy()
+
+    root.protocol("WM_DELETE_WINDOW", chiudi_senza_salvare)
 
     def annulla_ultimo():
         if not raccolta:
@@ -538,14 +579,16 @@ def raccogli_cifre(campioni_per_cifra=10, titolo="Dataset personale MNIST"):
 
     # Bottone "Fine" sotto l'anteprima: termina la raccolta con i disegni raccolti fin qui.
     RoundedButton(left_frame, width=160, height=45, text="✅ Fine", bg_color='#4472c4', fg_color='white', command=fine).pack(pady=(15, 0))
-    tk.Label(left_frame, text="Puoi terminare in qualsiasi momento: i disegni raccolti passano al notebook.",
+    tk.Label(left_frame, text="Fine = i disegni sostituiscono il dataset salvato.\n"
+                              "X della finestra = raccolta annullata, resta il dataset salvato.",
              font=("Helvetica", 9), bg='#e8e8e8', fg='#777777').pack(pady=(5, 0))
 
     mostra_ultimo(None)
     aggiorna_interfaccia()
     root.mainloop()
 
-    if not raccolta:
+    # Senza "Fine" (finestra chiusa con la X) o senza disegni: nessun disegno restituito.
+    if not stato['confermata'] or not raccolta:
         return np.zeros((0, 28, 28), np.uint8), np.zeros(0, np.int64), np.zeros((0, canvas_size, canvas_size), np.uint8)
     labels = np.array([c for c, _, _ in raccolta], dtype=np.int64)
     images = np.stack([img for _, img, _ in raccolta])

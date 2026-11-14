@@ -10,8 +10,9 @@ Contiene **MNIST** dataset (`.\MNIST`), [**Cross-Sim**](https://github.com/sandi
 Altri file aggiunti:
 - `lavagna.py` : funzioni riutilizzabili da qualsiasi notebook: `apri_lavagna` (lavagna interattiva per classificare cifre disegnate e confrontare più reti) e `raccogli_cifre` / `salva_dataset` (raccolta del dataset personale e dei disegni per la verifica della robustezza). In tutte le lavagne il disegno viene solo rimpicciolito a 28x28, senza adattarlo a MNIST; la funzione di adattamento (`preprocess_drawing`) resta nel file, non usata, per poterla rimettere
 - `dataset_personale/` e `dataset_personale.pt` : dataset personale (immagini 28x28 e disegni originali; file unico con la stessa struttura dei file MNIST, ma con i disegni non adattati a MNIST)
-- `trained_mnist_cnn.pt` e `trained_mnist_cnn_dropout.pt` : pesi delle due reti allenate nel notebook 1
-- `trained_mnist_cnn_personale.pt` e `trained_mnist_cnn_dropout_personale.pt` : pesi delle due reti allenate anche sul dataset personale nel notebook 2
-- `trained_mnist_cnn_*_hat.pt` (4 file) : pesi delle 4 reti dopo l'Hardware-Aware Training del notebook 3
+- `modelli/` : pesi di tutte le reti
+  - `trained_mnist_cnn.pt` e `trained_mnist_cnn_dropout.pt` : le due reti allenate nel notebook 1
+  - `trained_mnist_cnn_personale.pt` e `trained_mnist_cnn_dropout_personale.pt` : le due reti allenate anche sul dataset personale nel notebook 2
+  - `trained_mnist_cnn*_hat.pt` (4 file) : le 4 reti dopo l'Hardware-Aware Training del notebook 3
 - `robustezza_lavagna.pt` : disegni (4 per cifra) usati nel notebook 3 per verificare la robustezza delle reti
-- `grafici/` : grafici del notebook 3 (scelta del weight clipping, pesi prima e dopo l'HAT, accuratezza per chip, robustezza alla rotazione, riepilogo); `train_val_loss_hat.png` : curve di loss dell'HAT
+- `grafici/` : tutti i grafici salvati dai notebook: curve di loss del training (`train_val_loss_pytorch.png`, notebook 1) e dell'HAT (`train_val_loss_hat.png`, notebook 3), scelta del weight clipping, accuratezza per chip, robustezza alla rotazione e riepilogo (notebook 3)
